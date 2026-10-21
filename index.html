@@ -61,6 +61,7 @@
   }
 
   function fmt(v) { return v == null ? '--' : String(Math.round(v)); }
+  function fmtDecimal(v) { return v == null ? '--' : v.toFixed(2); }
 
   function render() {
     var s = compute(taps);
@@ -75,9 +76,9 @@
                    : (s.err > 1.5 ? 'Still settling…' : 'Almost there…');
     }
     $('bpm').textContent = s ? fmt(s.bpm) : '--';
-    $('avg').textContent = s ? fmt(s.bpm) : '--';
-    $('min').textContent = s ? fmt(s.bpm - s.err) : '--';
-    $('max').textContent = s ? fmt(s.bpm + s.err) : '--';
+    $('avg').textContent = s ? fmtDecimal(s.bpm) : '--';
+    $('min').textContent = s ? fmtDecimal(s.bpm - s.err) : '--';
+    $('max').textContent = s ? fmtDecimal(s.bpm + s.err) : '--';
     var fill = $('gaugeFill');
     fill.style.width = pct + '%';
     fill.style.background = locked ? 'hsl(130,70%,45%)' : 'hsl(' + (pct * 0.9) + ',70%,45%)';
