@@ -68,7 +68,7 @@
 
   function render() {
     var s = compute(taps);
-    if (s && s.stability >= 80) minMaxReady = true;
+    if (s && taps.length >= 17 && s.stability >= 85) minMaxReady = true;
     $('bpm').textContent = s ? fmt(s.avg) : '--';
     $('min').textContent = s && minMaxReady ? fmt(s.min) : '--';
     $('avg').textContent = s ? fmt(s.avg) : '--';
