@@ -16,6 +16,7 @@
   #gauge { width: min(400px, 90%); height: 20px; margin: .5rem auto; background: #333; border-radius: 10px; overflow: hidden; }
   #gaugeFill { height: 100%; width: 0; background: #888; transition: width .2s, background .2s; }
   #reset { margin-top: 1rem; padding: .5rem 1.5rem; }
+  footer { margin-top: 2rem; color: #999; font-size: .8rem; }
 </style>
 </head>
 <body>
@@ -31,6 +32,7 @@
 <div id="gauge" role="meter" aria-label="Stability" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="gaugeFill"></div></div>
 <div id="stab">--</div>
 <button id="reset">Reset</button>
+<footer>v1.1</footer>
 <script>
 (function () {
   var taps = [];
