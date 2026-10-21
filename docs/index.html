@@ -67,7 +67,7 @@
 
   function render() {
     var s = compute(taps);
-    if (s && taps.length >= 17 && s.stability >= 85 && !minMaxReady) {
+    if (s && taps.length >= 17 && !minMaxReady) {
       minBpm = s.avg;
       maxBpm = s.avg;
       minMaxReady = true;
