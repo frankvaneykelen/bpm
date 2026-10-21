@@ -60,7 +60,7 @@
     return { bpm: bpm, err: bpm * se / period, n: n };
   }
 
-  function fmt(v) { return v == null ? '--' : v.toFixed(1); }
+  function fmt(v) { return v == null ? '--' : String(Math.round(v)); }
 
   function render() {
     var s = compute(taps);
