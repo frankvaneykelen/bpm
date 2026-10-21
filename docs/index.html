@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BPM Tap Meter</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #111; color: #eee; text-align: center; margin: 0; padding: 1.5rem; }
+  h1 { font-size: 1.3rem; }
+  #bpm { font-size: 4.5rem; font-weight: bold; margin: .5rem 0; }
+  #tap { font-size: 2rem; padding: 2rem 4rem; border-radius: 1rem; border: 0; background: #2d7ff9; color: #fff; cursor: pointer; touch-action: manipulation; }
+  #tap:active { background: #1b5cc0; }
+  .stats { display: flex; justify-content: center; gap: 2rem; margin: 1.5rem 0; }
+  .stats div span { display: block; font-size: 1.8rem; }
+  .stats small { color: #999; }
+  #gauge { width: min(400px, 90%); height: 20px; margin: .5rem auto; background: #333; border-radius: 10px; overflow: hidden; }
+  #gaugeFill { height: 100%; width: 0; background: #888; transition: width .2s, background .2s; }
+  #reset { margin-top: 1rem; padding: .5rem 1.5rem; }
+</style>
+</head>
+<body>
+<h1>BPM Tap Meter</h1>
+<div id="bpm">--</div>
+<button id="tap">Tap (or press space)</button>
+<div class="stats">
+  <div><small>Min</small><span id="min">--</span></div>
+  <div><small>Avg</small><span id="avg">--</span></div>
+  <div><small>Max</small><span id="max">--</span></div>
+</div>
+<div><small>Stability</small></div>
+<div id="gauge" role="meter" aria-label="Stability" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="gaugeFill"></div></div>
+<div id="stab">--</div>
+<button id="reset">Reset</button>
+<script>
+(function () {
+  var taps = [];
+  var $ = function (id) { return document.getElementById(id); };
+
+  // Pure computation: timestamps (ms) -> stats.
+  function compute(times) {
+    if (times.length < 2) return null;
+    var iv = [], bpms = [], i;
+    for (i = 1; i < times.length; i++) {
+      iv.push(times[i] - times[i - 1]);
+      bpms.push(60000 / iv[i - 1]);
+    }
+    var mean = iv.reduce(function (a, b) { return a + b; }, 0) / iv.length;
+    var stability = null;
+    if (iv.length >= 2) {
+      var variance = iv.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / iv.length;
+      var cv = Math.sqrt(variance) / mean;
+      // 0% deviation -> 100% stable; 20% or more deviation -> 0%
+      stability = Math.max(0, Math.min(100, 100 * (1 - cv / 0.2)));
+    }
+    return {
+      current: bpms[bpms.length - 1],
+      avg: 60000 / mean,
+      min: Math.min.apply(null, bpms),
+      max: Math.max.apply(null, bpms),
+      stability: stability
+    };
+  }
+
+  function fmt(v) { return v == null ? '--' : v.toFixed(1); }
+
+  function render() {
+    var s = compute(taps);
+    $('bpm').textContent = s ? fmt(s.avg) : '--';
+    $('min').textContent = s ? fmt(s.min) : '--';
+    $('avg').textContent = s ? fmt(s.avg) : '--';
+    $('max').textContent = s ? fmt(s.max) : '--';
+    var st = s ? s.stability : null;
+    var pct = st == null ? 0 : st;
+    var fill = $('gaugeFill');
+    fill.style.width = pct + '%';
+    fill.style.background = 'hsl(' + (pct * 1.2) + ',70%,45%)';
+    $('gauge').setAttribute('aria-valuenow', Math.round(pct));
+    $('stab').textContent = st == null ? '--' : Math.round(st) + '%';
+  }
+
+  function tap() { taps.push(performance.now()); render(); }
+
+  $('tap').addEventListener('mousedown', function (e) { e.preventDefault(); tap(); });
+  $('tap').addEventListener('touchstart', function (e) { e.preventDefault(); tap(); }, { passive: false });
+  $('tap').addEventListener('click', function (e) { e.preventDefault(); });
+  $('reset').addEventListener('click', function () { taps = []; render(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(); }
+  });
+  render();
+})();
+</script>
+</body>
+</html>
