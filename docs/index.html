@@ -24,82 +24,93 @@
 <div id="bpm">--</div>
 <button id="tap">Tap (or press space)</button>
 <div class="stats">
-  <div><small>Min</small><span id="min">--</span></div>
+  <div><small>Low</small><span id="min">--</span></div>
   <div><small>Avg</small><span id="avg">--</span></div>
-  <div><small>Max</small><span id="max">--</span></div>
+  <div><small>High</small><span id="max">--</span></div>
 </div>
-<div><small>Stability</small></div>
-<div id="gauge" role="meter" aria-label="Stability" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="gaugeFill"></div></div>
+<div><small>Confidence</small></div>
+<div id="gauge" role="meter" aria-label="Confidence" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="gaugeFill"></div></div>
 <div id="stab">--</div>
 <button id="reset">Reset</button>
-<footer>v1.5</footer>
+<footer>v2.0</footer>
 <script>
 (function () {
   var taps = [];
-  var minMaxReady = false;
-  var minBpm = null;
-  var maxBpm = null;
+  var WARMUP = 2;          // ignore first taps
+  var WINDOW = 24;         // use most recent taps
+  var LOCK_ERR = 0.5;      // BPM uncertainty considered "accurate"
+  var LOCK_STREAK = 4;     // consecutive taps under threshold
+  var streak = 0, locked = false;
   var $ = function (id) { return document.getElementById(id); };
 
-  // Pure computation: timestamps (ms) -> stats.
+  // Least-squares fit of time = a + period * index. Returns bpm and its standard error (in BPM).
   function compute(times) {
-    if (times.length < 2) return null;
-    var iv = [], i;
-    for (i = 1; i < times.length; i++) {
-      iv.push(times[i] - times[i - 1]);
-    }
-    var mean = iv.reduce(function (a, b) { return a + b; }, 0) / iv.length;
-    var stability = null;
-    if (iv.length >= 2) {
-      var variance = iv.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / iv.length;
-      var cv = Math.sqrt(variance) / mean;
-      // 0% deviation -> 100% stable; 20% or more deviation -> 0%
-      stability = Math.max(0, Math.min(100, 100 * (1 - cv / 0.2)));
-    }
-    return {
-      current: 60000 / iv[iv.length - 1],
-      avg: 60000 / mean,
-      stability: stability
-    };
+    var t = times.slice(WARMUP).slice(-WINDOW);
+    var n = t.length;
+    if (n < 4) return null;
+    var im = (n - 1) / 2, tm = 0, i;
+    for (i = 0; i < n; i++) tm += t[i];
+    tm /= n;
+    var sxx = 0, sxy = 0;
+    for (i = 0; i < n; i++) { sxx += (i - im) * (i - im); sxy += (i - im) * (t[i] - tm); }
+    var period = sxy / sxx, a = tm - period * im, rss = 0;
+    for (i = 0; i < n; i++) { var r = t[i] - (a + period * i); rss += r * r; }
+    var se = Math.sqrt(rss / (n - 2)) / Math.sqrt(sxx);
+    var bpm = 60000 / period;
+    return { bpm: bpm, err: bpm * se / period, n: n };
   }
 
   function fmt(v) { return v == null ? '--' : v.toFixed(1); }
 
   function render() {
     var s = compute(taps);
-    if (s && taps.length >= 17 && s.stability >= 85 && !minMaxReady) {
-      minBpm = s.avg;
-      maxBpm = s.avg;
-      minMaxReady = true;
-    } else if (s && minMaxReady) {
-      minBpm = Math.min(minBpm, s.current);
-      maxBpm = Math.max(maxBpm, s.current);
+    var pct = 0, msg = taps.length ? 'Keep tapping…' : 'Tap along with the beat';
+    if (s) {
+      // 0 err -> 100%, 3 BPM err -> 0%
+      pct = Math.max(0, Math.min(100, 100 * (1 - s.err / 3)));
+      streak = s.err <= LOCK_ERR ? streak + 1 : 0;
+      if (streak >= LOCK_STREAK) locked = true;
+      if (s.err > LOCK_ERR * 3) locked = false;   // lost the beat
+      msg = locked ? '✓ Locked – you can stop tapping'
+                   : (s.err > 1.5 ? 'Still settling…' : 'Almost there…');
     }
-    $('bpm').textContent = s ? fmt(s.avg) : '--';
-    $('min').textContent = s && minMaxReady ? fmt(minBpm) : '--';
-    $('avg').textContent = s ? fmt(s.avg) : '--';
-    $('max').textContent = s && minMaxReady ? fmt(maxBpm) : '--';
-    var st = s ? s.stability : null;
-    var pct = st == null ? 0 : st;
+    $('bpm').textContent = s ? fmt(s.bpm) : '--';
+    $('avg').textContent = s ? fmt(s.bpm) : '--';
+    $('min').textContent = s ? fmt(s.bpm - s.err) : '--';
+    $('max').textContent = s ? fmt(s.bpm + s.err) : '--';
     var fill = $('gaugeFill');
     fill.style.width = pct + '%';
-    fill.style.background = 'hsl(' + (pct * 1.2) + ',70%,45%)';
+    fill.style.background = locked ? 'hsl(130,70%,45%)' : 'hsl(' + (pct * 0.9) + ',70%,45%)';
     $('gauge').setAttribute('aria-valuenow', Math.round(pct));
-    $('stab').textContent = st == null ? '--' : Math.round(st) + '%';
+    $('stab').textContent = s ? msg + '  (±' + s.err.toFixed(2) + ' BPM)' : msg;
+    $('bpm').style.color = locked ? '#5f5' : '';
   }
 
-  function tap() { taps.push(performance.now()); render(); }
+  function reset() { taps = []; streak = 0; locked = false; render(); }
 
-  $('tap').addEventListener('mousedown', function (e) { e.preventDefault(); $('tap').classList.add('pressed'); tap(); });
-  $('tap').addEventListener('mouseup', function () { $('tap').classList.remove('pressed'); });
-  $('tap').addEventListener('mouseleave', function () { $('tap').classList.remove('pressed'); });
-  $('tap').addEventListener('touchstart', function (e) { e.preventDefault(); $('tap').classList.add('pressed'); tap(); }, { passive: false });
-  $('tap').addEventListener('touchend', function () { $('tap').classList.remove('pressed'); });
-  $('tap').addEventListener('touchcancel', function () { $('tap').classList.remove('pressed'); });
-  $('tap').addEventListener('click', function (e) { e.preventDefault(); });
-  $('reset').addEventListener('click', function () { taps = []; minMaxReady = false; minBpm = null; maxBpm = null; render(); });
+  function tap(ts) {
+    ts = ts || performance.now();
+    var last = taps[taps.length - 1];
+    if (last != null) {
+      // Long pause relative to cadence: start a fresh measurement
+      var cadence = taps.length >= 3 ? (last - taps[0]) / (taps.length - 1) : 1000;
+      if (ts - last > Math.max(2.5 * cadence, 2000)) reset();
+    }
+    taps.push(ts);
+    render();
+  }
+
+  var btn = $('tap');
+  btn.addEventListener('mousedown', function (e) { e.preventDefault(); btn.classList.add('pressed'); tap(e.timeStamp); });
+  btn.addEventListener('mouseup', function () { btn.classList.remove('pressed'); });
+  btn.addEventListener('mouseleave', function () { btn.classList.remove('pressed'); });
+  btn.addEventListener('touchstart', function (e) { e.preventDefault(); btn.classList.add('pressed'); tap(e.timeStamp); }, { passive: false });
+  btn.addEventListener('touchend', function () { btn.classList.remove('pressed'); });
+  btn.addEventListener('touchcancel', function () { btn.classList.remove('pressed'); });
+  btn.addEventListener('click', function (e) { e.preventDefault(); });
+  $('reset').addEventListener('click', function (e) { e.currentTarget.blur(); reset(); });
   document.addEventListener('keydown', function (e) {
-    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(); }
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(e.timeStamp); }
   });
   render();
 })();
