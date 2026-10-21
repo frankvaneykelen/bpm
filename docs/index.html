@@ -9,7 +9,7 @@
   h1 { font-size: 1.3rem; }
   #bpm { font-size: 4.5rem; font-weight: bold; margin: .5rem 0; }
   #tap { font-size: 2rem; padding: 2rem 4rem; border-radius: 1rem; border: 0; background: #2d7ff9; color: #fff; cursor: pointer; touch-action: manipulation; }
-  #tap:active { background: #1b5cc0; }
+  #tap:active, #tap.pressed { background: #1b5cc0; }
   .stats { display: flex; justify-content: center; gap: 2rem; margin: 1.5rem 0; }
   .stats div span { display: block; font-size: 1.8rem; }
   .stats small { color: #999; }
@@ -80,8 +80,12 @@
 
   function tap() { taps.push(performance.now()); render(); }
 
-  $('tap').addEventListener('mousedown', function (e) { e.preventDefault(); tap(); });
-  $('tap').addEventListener('touchstart', function (e) { e.preventDefault(); tap(); }, { passive: false });
+  $('tap').addEventListener('mousedown', function (e) { e.preventDefault(); $('tap').classList.add('pressed'); tap(); });
+  $('tap').addEventListener('mouseup', function () { $('tap').classList.remove('pressed'); });
+  $('tap').addEventListener('mouseleave', function () { $('tap').classList.remove('pressed'); });
+  $('tap').addEventListener('touchstart', function (e) { e.preventDefault(); $('tap').classList.add('pressed'); tap(); }, { passive: false });
+  $('tap').addEventListener('touchend', function () { $('tap').classList.remove('pressed'); });
+  $('tap').addEventListener('touchcancel', function () { $('tap').classList.remove('pressed'); });
   $('tap').addEventListener('click', function (e) { e.preventDefault(); });
   $('reset').addEventListener('click', function () { taps = []; render(); });
   document.addEventListener('keydown', function (e) {
