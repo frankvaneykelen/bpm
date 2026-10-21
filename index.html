@@ -37,15 +37,16 @@
 (function () {
   var taps = [];
   var minMaxReady = false;
+  var minBpm = null;
+  var maxBpm = null;
   var $ = function (id) { return document.getElementById(id); };
 
   // Pure computation: timestamps (ms) -> stats.
   function compute(times) {
     if (times.length < 2) return null;
-    var iv = [], bpms = [], i;
+    var iv = [], i;
     for (i = 1; i < times.length; i++) {
       iv.push(times[i] - times[i - 1]);
-      bpms.push(60000 / iv[i - 1]);
     }
     var mean = iv.reduce(function (a, b) { return a + b; }, 0) / iv.length;
     var stability = null;
@@ -56,10 +57,8 @@
       stability = Math.max(0, Math.min(100, 100 * (1 - cv / 0.2)));
     }
     return {
-      current: bpms[bpms.length - 1],
+      current: 60000 / iv[iv.length - 1],
       avg: 60000 / mean,
-      min: Math.min.apply(null, bpms),
-      max: Math.max.apply(null, bpms),
       stability: stability
     };
   }
@@ -68,11 +67,18 @@
 
   function render() {
     var s = compute(taps);
-    if (s && taps.length >= 17 && s.stability >= 85) minMaxReady = true;
+    if (s && taps.length >= 17 && s.stability >= 85 && !minMaxReady) {
+      minBpm = s.avg;
+      maxBpm = s.avg;
+      minMaxReady = true;
+    } else if (s && minMaxReady) {
+      minBpm = Math.min(minBpm, s.current);
+      maxBpm = Math.max(maxBpm, s.current);
+    }
     $('bpm').textContent = s ? fmt(s.avg) : '--';
-    $('min').textContent = s && minMaxReady ? fmt(s.min) : '--';
+    $('min').textContent = s && minMaxReady ? fmt(minBpm) : '--';
     $('avg').textContent = s ? fmt(s.avg) : '--';
-    $('max').textContent = s && minMaxReady ? fmt(s.max) : '--';
+    $('max').textContent = s && minMaxReady ? fmt(maxBpm) : '--';
     var st = s ? s.stability : null;
     var pct = st == null ? 0 : st;
     var fill = $('gaugeFill');
@@ -91,7 +97,7 @@
   $('tap').addEventListener('touchend', function () { $('tap').classList.remove('pressed'); });
   $('tap').addEventListener('touchcancel', function () { $('tap').classList.remove('pressed'); });
   $('tap').addEventListener('click', function (e) { e.preventDefault(); });
-  $('reset').addEventListener('click', function () { taps = []; minMaxReady = false; render(); });
+  $('reset').addEventListener('click', function () { taps = []; minMaxReady = false; minBpm = null; maxBpm = null; render(); });
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(); }
   });
