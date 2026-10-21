@@ -34,6 +34,7 @@
 <script>
 (function () {
   var taps = [];
+  var minMaxReady = false;
   var $ = function (id) { return document.getElementById(id); };
 
   // Pure computation: timestamps (ms) -> stats.
@@ -65,10 +66,11 @@
 
   function render() {
     var s = compute(taps);
+    if (s && s.stability >= 80) minMaxReady = true;
     $('bpm').textContent = s ? fmt(s.avg) : '--';
-    $('min').textContent = s ? fmt(s.min) : '--';
+    $('min').textContent = s && minMaxReady ? fmt(s.min) : '--';
     $('avg').textContent = s ? fmt(s.avg) : '--';
-    $('max').textContent = s ? fmt(s.max) : '--';
+    $('max').textContent = s && minMaxReady ? fmt(s.max) : '--';
     var st = s ? s.stability : null;
     var pct = st == null ? 0 : st;
     var fill = $('gaugeFill');
@@ -87,7 +89,7 @@
   $('tap').addEventListener('touchend', function () { $('tap').classList.remove('pressed'); });
   $('tap').addEventListener('touchcancel', function () { $('tap').classList.remove('pressed'); });
   $('tap').addEventListener('click', function (e) { e.preventDefault(); });
-  $('reset').addEventListener('click', function () { taps = []; render(); });
+  $('reset').addEventListener('click', function () { taps = []; minMaxReady = false; render(); });
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && !e.repeat) { e.preventDefault(); tap(); }
   });
